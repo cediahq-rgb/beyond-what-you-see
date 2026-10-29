@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Image Comparison Slider</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom CSS for specific range/clip styles & smooth UI -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.8);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(71, 85, 105, 1);
+        }
+
+        /* Glassmorphism card styles */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-button {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            transition: all 0.2s ease;
+        }
+        .glass-button:hover {
+            background: rgba(51, 65, 85, 0.9);
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Drag handle pulse animation on hover */
+        .handle-line {
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Prevent image dragging natively */
+        img {
+            pointer-events: none;
+            -webkit-user-drag: none;
+        }
+
+        /* Custom range slider reset for smooth overlay control */
+        .slider-overlay {
+            -webkit-appearance: none;
+            appearance: none;
+            background: transparent;
+            cursor: pointer;
+        }
+        .slider-overlay::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 0;
+            height: 0;
+        }
+        .slider-overlay::-moz-range-thumb {
+            width: 0;
+            height: 0;
+            border: none;
+            background: transparent;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+    <!-- Header Navbar -->
+    <header class="glass-panel sticky top-0 z-40 w-full px-4 lg:px-8 py-3.5 flex items-center justify-between border-b border-slate-800">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-xl shadow-lg shadow-indigo-500/20">
+                <i data-lucide="split-square-vertical" class="w-6 h-6 text-white"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight tracking-wide bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-200 to-slate-400">
+                    VisualWipe Pro
+                </h1>
+                <p class="text-xs text-slate-400 hidden sm:block">Interactive Image Comparison Studio</p>
+            </div>
+        </div>
+
+        <!-- Quick Toolbar Controls -->
+        <div class="flex items-center gap-2 sm:gap-3">
+            <!-- Sample Preset Selector Dropdown -->
+            <div class="relative">
+                <select id="sampleSelect" class="glass-button text-xs sm:text-sm px-3 py-2 rounded-xl text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer pr-8 appearance-none font-medium">
+                    <option value="" disabled selected class="bg-slate-900 text-slate-400">⚡ Load Preset Pair</option>
+                    <option value="retouch" class="bg-slate-900 text-white">✨ Photo Retouching</option>
+                    <option value="daynight" class="bg-slate-900 text-white">🌇 Day vs Night City</option>
+                    <option value="season" class="bg-slate-900 text-white">🌲 Summer vs Winter</option>
+                    <option value="sketch" class="bg-slate-900 text-white">🎨 Sketch vs Render</option>
+                </select>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            </div>
+
+            <!-- Upload Toggle Button -->
+            <button id="openUploadModalBtn" class="glass-button flex items-center gap-2 text-xs sm:text-sm px-3.5 py-2 rounded-xl text-indigo-300 hover:text-white font-medium">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">Upload Images</span>
+            </button>
+
+            <!-- Fullscreen Button -->
+            <button id="fullscreenBtn" title="Toggle Fullscreen" class="glass-button p-2 rounded-xl text-slate-300 hover:text-white">
+                <i data-lucide="maximize-2" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="flex-1 flex flex-col lg:flex-row gap-4 p-4 lg:p-6 max-w-[1700px] w-full mx-auto overflow-hidden">
+
+        <!-- Left / Top Interactive Viewport Frame -->
+        <section class="flex-1 flex flex-col items-center justify-center relative min-h-[420px] lg:min-h-[600px] bg-slate-900/60 rounded-2xl border border-slate-800/80 overflow-hidden shadow-2xl group">
+            
+            <!-- Comparison Stage Area -->
+            <div id="comparisonContainer" class="relative w-full h-full flex items-center justify-center overflow-hidden cursor-crosshair select-none bg-slate-950/40">
+                
+                <!-- Background Grid Pattern for Transparency -->
+                <div class="absolute inset-0 opacity-10 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none"></div>
+
+                <!-- Zoom & Pan Wrapper -->
+                <div id="zoomPanWrapper" class="relative w-full h-full flex items-center justify-center transition-transform duration-75 origin-center">
+                    
+                    <!-- BASE IMAGE (AFTER / UNDERNEATH) -->
+                    <div id="afterImageContainer" class="absolute inset-0 flex items-center justify-center">
+                        <img id="afterImg" src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1600&q=80" 
+                             alt="After Image" class="max-w-full max-h-full object-contain w-full h-full" />
+                    </div>
+
+                    <!-- OVERLAY IMAGE (BEFORE / CLIPPED ON TOP) -->
+                    <div id="beforeImageContainer" class="absolute inset-0 flex items-center justify-center overflow-hidden">
+                        <img id="beforeImg" src="https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1600&q=80&sat=-100" 
+                             alt="Before Image" class="max-w-full max-h-full object-contain w-full h-full" />
+                    </div>
+
+                    <!-- WIPER DIVIDER LINE & HANDLE -->
+                    <div id="sliderDivider" class="absolute z-20 top-0 left-0 w-full h-full pointer-events-none flex items-center justify-center">
+                        <!-- Divider Bar -->
+                        <div id="dividerBar" class="absolute bg-white shadow-[0_0_15px_rgba(0,0,0,0.6)] z-20 transition-colors duration-200"></div>
+                        
+                        <!-- Draggable Button Handle -->
+                        <div id="sliderHandle" class="absolute z-30 w-11 h-11 bg-white/90 backdrop-blur-md rounded-full shadow-2xl border-2 border-slate-900/20 flex items-center justify-center cursor-grab active:cursor-grabbing text-slate-800 hover:scale-105 active:scale-95 transition-transform">
+                            <i id="handleIcon" data-lucide="chevrons-left-right" class="w-5 h-5 transition-transform duration-200"></i>
+                        </div>
+                    </div>
+
+                    <!-- Floating Interactive Image Labels -->
+                    <div id="beforeLabel" class="absolute z-20 px-3 py-1.5 rounded-lg bg-slate-900/80 backdrop-blur-md border border-white/10 text-xs font-semibold text-white tracking-wider uppercase shadow-lg transition-opacity duration-300 pointer-events-none">
+                        <span id="beforeLabelText">Before</span>
+                    </div>
+                    <div id="afterLabel" class="absolute z-20 px-3 py-1.5 rounded-lg bg-slate-900/80 backdrop-blur-md border border-white/10 text-xs font-semibold text-white tracking-wider uppercase shadow-lg transition-opacity duration-300 pointer-events-none">
+                        <span id="afterLabelText">After</span>
+                    </div>
+
+                </div>
+
+                <!-- Invisibly Covering Touch/Drag Range Overlay -->
+                <input type="range" id="sliderRange" min="0" max="100" value="50" step="0.1" class="slider-overlay absolute inset-0 w-full h-full z-30 opacity-0 cursor-ew-resize">
+            </div>
+
+            <!-- Floating Quick Zoom & Reset Controls Bar (Overlay on Stage) -->
+            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 glass-panel px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-xl text-xs font-medium border border-slate-700/60">
+                <button id="zoomOutBtn" title="Zoom Out" class="p-1.5 hover:bg-slate-800 rounded-full text-slate-300 hover:text-white transition-colors">
+                    <i data-lucide="zoom-out" class="w-4 h-4"></i>
+                </button>
+                <span id="zoomLevelText" class="w-12 text-center text-slate-300 font-mono text-[11px]">100%</span>
+                <button id="zoomInBtn" title="Zoom In" class="p-1.5 hover:bg-slate-800 rounded-full text-slate-300 hover:text-white transition-colors">
+                    <i data-lucide="zoom-in" class="w-4 h-4"></i>
+                </button>
+                <div class="w-px h-4 bg-slate-700/80 mx-1"></div>
+                <button id="resetZoomBtn" title="Reset Zoom & Pan" class="px-2 py-1 hover:bg-slate-800 rounded-md text-slate-400 hover:text-slate-200 text-[11px] transition-colors">
+                    Reset View
+                </button>
+            </div>
+
+            <!-- Keyboard Navigation Instructions Tooltip -->
+            <div class="absolute top-4 left-4 z-20 hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/60 backdrop-blur-md border border-slate-800 text-[11px] text-slate-400">
+                <i data-lucide="keyboard" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span>Use <kbd class="px-1 py-0.5 bg-slate-800 rounded text-slate-200">←</kbd> <kbd class="px-1 py-0.5 bg-slate-800 rounded text-slate-200">→</kbd> or Drag to Wipe</span>
+            </div>
+        </section>
+
+        <!-- Right / Bottom Control Sidebar -->
+        <aside class="w-full lg:w-80 flex flex-col gap-4">
+            
+            <!-- Controls Card -->
+            <div class="glass-panel p-5 rounded-2xl flex flex-col gap-5 border border-slate-800">
+                <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                    <h2 class="font-semibold text-sm text-slate-200 flex items-center gap-2">
+                        <i data-lucide="sliders" class="w-4 h-4 text-indigo-400"></i>
+                        Slider Controls
+                    </h2>
+                    <span id="positionBadge" class="font-mono text-xs text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">50%</span>
+                </div>
+
+                <!-- Position Quick Presets Buttons -->
+                <div class="flex flex-col gap-2">
+                    <label class="text-xs text-slate-400 font-medium">Position Presets</label>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button data-preset="25" class="preset-btn glass-button py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white">25%</button>
+                        <button data-preset="50" class="preset-btn glass-button py-1.5 rounded-lg text-xs font-semibold text-indigo-300 hover:text-white border-indigo-500/30">50%</button>
+                        <button data-preset="75" class="preset-btn glass-button py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white">75%</button>
+                        <button id="autoScanBtn" class="glass-button py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white flex items-center justify-center gap-1">
+                            <i data-lucide="play" class="w-3 h-3 text-emerald-400"></i> Auto
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Orientation Switch & Swap Actions -->
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <button id="orientationBtn" class="glass-button py-2.5 px-3 rounded-xl text-xs font-medium text-slate-200 flex items-center justify-center gap-2">
+                        <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-slate-400"></i>
+                        <span id="orientationLabel">Horizontal</span>
+                    </button>
+                    <button id="swapImagesBtn" class="glass-button py-2.5 px-3 rounded-xl text-xs font-medium text-slate-200 flex items-center justify-center gap-2">
+                        <i data-lucide="arrow-right-left" class="w-3.5 h-3.5 text-slate-400"></i>
+                        <span>Swap Images</span>
+                    </button>
+                </div>
+
+                <!-- Label Customization Settings -->
+                <div class="space-y-3 pt-2 border-t border-slate-800/80">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                            <i data-lucide="tag" class="w-3.5 h-3.5 text-slate-400"></i>
+                            Display Overlay Labels
+                        </label>
+                        <input type="checkbox" id="toggleLabelsCheckbox" checked class="w-4 h-4 accent-indigo-600 rounded cursor-pointer">
+                    </div>
+
+                    <!-- Label Editing Text Inputs -->
+                    <div id="labelsConfigArea" class="grid grid-cols-2 gap-2">
+                        <div>
+                            <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Before Label</span>
+                            <input type="text" id="beforeInputText" value="Before" class="w-full mt-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-500 uppercase font-bold tracking-wider">After Label</span>
+                            <input type="text" id="afterInputText" value="After" class="w-full mt-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Color Accent Picker for Wipe Handle -->
+                <div class="space-y-2 pt-2 border-t border-slate-800/80">
+                    <label class="text-xs text-slate-400 font-medium block">Divider Line Theme</label>
+                    <div class="flex items-center gap-2">
+                        <button data-color="#ffffff" class="theme-color-btn w-6 h-6 rounded-full bg-white border-2 border-indigo-500 ring-2 ring-indigo-500/30 transition-transform hover:scale-110"></button>
+                        <button data-color="#6366f1" class="theme-color-btn w-6 h-6 rounded-full bg-indigo-500 border-2 border-transparent transition-transform hover:scale-110"></button>
+                        <button data-color="#10b981" class="theme-color-btn w-6 h-6 rounded-full bg-emerald-500 border-2 border-transparent transition-transform hover:scale-110"></button>
+                        <button data-color="#f43f5e" class="theme-color-btn w-6 h-6 rounded-full bg-rose-500 border-2 border-transparent transition-transform hover:scale-110"></button>
+                        <button data-color="#eab308" class="theme-color-btn w-6 h-6 rounded-full bg-yellow-500 border-2 border-transparent transition-transform hover:scale-110"></button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Quick Info / Help Card -->
+            <div class="glass-panel p-4 rounded-2xl flex items-start gap-3 border border-slate-800/80 text-xs text-slate-400">
+                <i data-lucide="info" class="w-4 h-4 text-indigo-400 shrink-0 mt-0.5"></i>
+                <p class="leading-relaxed">
+                    Drag the central divider line horizontally or vertically to compare changes between image layers in real-time. Double-click view to reset zoom.
+                </p>
+            </div>
+        </aside>
+
+    </main>
+
+    <!-- Upload Custom Images Modal -->
+    <div id="uploadModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel max-w-lg w-full p-6 rounded-2xl border border-slate-800 shadow-2xl flex flex-col gap-5 transform scale-95 transition-transform duration-300" id="uploadModalContent">
+            
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="image-plus" class="w-5 h-5 text-indigo-400"></i>
+                    <h3 class="font-bold text-slate-100 text-base">Load Custom Images</h3>
+                </div>
+                <button id="closeUploadModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Upload Zones Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                
+                <!-- Before Drop Zone -->
+                <div class="flex flex-col gap-2">
+                    <span class="text-xs font-semibold text-slate-300">"Before" Image</span>
+                    <label id="beforeDropZone" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-700 hover:border-indigo-500/80 rounded-xl bg-slate-900/50 hover:bg-slate-900 cursor-pointer transition-all h-36 group text-center">
+                        <i data-lucide="upload-cloud" class="w-7 h-7 text-slate-500 group-hover:text-indigo-400 mb-2 transition-colors"></i>
+                        <span class="text-xs text-slate-300 font-medium">Click or Drag Image</span>
+                        <span class="text-[10px] text-slate-500 mt-1">PNG, JPG, WEBP</span>
+                        <input type="file" id="beforeFileInput" accept="image/*" class="hidden">
+                    </label>
+                </div>
+
+                <!-- After Drop Zone -->
+                <div class="flex flex-col gap-2">
+                    <span class="text-xs font-semibold text-slate-300">"After" Image</span>
+                    <label id="afterDropZone" class="flex flex-col items-center justify-center p-4 border-2 border-dashed border-slate-700 hover:border-indigo-500/80 rounded-xl bg-slate-900/50 hover:bg-slate-900 cursor-pointer transition-all h-36 group text-center">
+                        <i data-lucide="upload-cloud" class="w-7 h-7 text-slate-500 group-hover:text-indigo-400 mb-2 transition-colors"></i>
+                        <span class="text-xs text-slate-300 font-medium">Click or Drag Image</span>
+                        <span class="text-[10px] text-slate-500 mt-1">PNG, JPG, WEBP</span>
+                        <input type="file" id="afterFileInput" accept="image/*" class="hidden">
+                    </label>
+                </div>
+
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="flex justify-end gap-3 pt-2">
+                <button id="cancelUploadBtn" class="px-4 py-2 rounded-xl glass-button text-xs font-medium text-slate-300 hover:text-white">Cancel</button>
+                <button id="applyUploadBtn" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all">Apply Images</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Logic JavaScript -->
+    <script>
+        // Preset Image Library
+        const SAMPLE_PAIRS = {
+            retouch: {
+                before: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1600&q=80&sat=-80&blur=2',
+                after: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1600&q=80',
+                beforeLabel: 'Raw Unedited',
+                afterLabel: 'Retouched'
+            },
+            daynight: {
+                before: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1600&q=80&sat=-100',
+                after: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1600&q=80',
+                beforeLabel: 'Day / Monochrome',
+                afterLabel: 'Night Neon'
+            },
+            season: {
+                before: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=80',
+                after: 'https://images.unsplash.com/photo-1517411032315-54ef2cb783bb?auto=format&fit=crop&w=1600&q=80',
+                beforeLabel: 'Summer Beach',
+                afterLabel: 'Winter Snow'
+            },
+            sketch: {
+                before: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=1600&q=80&invert=100',
+                after: 'https://images.unsplash.com/photo-1541888946425-d0fbb186a5b3?auto=format&fit=crop&w=1600&q=80',
+                beforeLabel: 'Blueprint / Inverted',
+                afterLabel: '3D Render'
+            }
+        };
+
+        // Application State Management
+        const state = {
+            sliderPosition: 50, // Percentage 0 - 100
+            orientation: 'horizontal', // 'horizontal' | 'vertical'
+            isAutoScanning: false,
+            autoScanDirection: 1, // 1 forward, -1 backward
+            autoScanInterval: null,
+            zoomLevel: 1,
+            panX: 0,
+            panY: 0,
+            isPanning: false,
+            startPanX: 0,
+            startPanY: 0,
+            showLabels: true,
+            currentColor: '#ffffff',
+            tempUploads: {
+                before: null,
+                after: null
+            }
+        };
+
+        // DOM Element Selections
+        const elements = {
+            comparisonContainer: document.getElementById('comparisonContainer'),
+            zoomPanWrapper: document.getElementById('zoomPanWrapper'),
+            beforeImageContainer: document.getElementById('beforeImageContainer'),
+            afterImageContainer: document.getElementById('afterImageContainer'),
+            beforeImg: document.getElementById('beforeImg'),
+            afterImg: document.getElementById('afterImg'),
+            sliderRange: document.getElementById('sliderRange'),
+            sliderDivider: document.getElementById('sliderDivider'),
+            dividerBar: document.getElementById('dividerBar'),
+            sliderHandle: document.getElementById('sliderHandle'),
+            handleIcon: document.getElementById('handleIcon'),
+            beforeLabel: document.getElementById('beforeLabel'),
+            afterLabel: document.getElementById('afterLabel'),
+            beforeLabelText: document.getElementById('beforeLabelText'),
+            afterLabelText: document.getElementById('afterLabelText'),
+            positionBadge: document.getElementById('positionBadge'),
+            sampleSelect: document.getElementById('sampleSelect'),
+            autoScanBtn: document.getElementById('autoScanBtn'),
+            orientationBtn: document.getElementById('orientationBtn'),
+            orientationLabel: document.getElementById('orientationLabel'),
+            swapImagesBtn: document.getElementById('swapImagesBtn'),
+            toggleLabelsCheckbox: document.getElementById('toggleLabelsCheckbox'),
+            labelsConfigArea: document.getElementById('labelsConfigArea'),
+            beforeInputText: document.getElementById('beforeInputText'),
+            afterInputText: document.getElementById('afterInputText'),
+            zoomInBtn: document.getElementById('zoomInBtn'),
+            zoomOutBtn: document.getElementById('zoomOutBtn'),
+            resetZoomBtn: document.getElementById('resetZoomBtn'),
+            zoomLevelText: document.getElementById('zoomLevelText'),
+            fullscreenBtn: document.getElementById('fullscreenBtn'),
+            openUploadModalBtn: document.getElementById('openUploadModalBtn'),
+            closeUploadModalBtn: document.getElementById('closeUploadModalBtn'),
+            cancelUploadBtn: document.getElementById('cancelUploadBtn'),
+            applyUploadBtn: document.getElementById('applyUploadBtn'),
+            uploadModal: document.getElementById('uploadModal'),
+            uploadModalContent: document.getElementById('uploadModalContent'),
+            beforeFileInput: document.getElementById('beforeFileInput'),
+            afterFileInput: document.getElementById('afterFileInput'),
+            beforeDropZone: document.getElementById('beforeDropZone'),
+            afterDropZone: document.getElementById('afterDropZone')
+        };
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Core Update Function: Renders wipe clipping based on slider position and orientation
+        function updateSlider() {
+            const pos = state.sliderPosition;
+            if (elements.sliderRange) {
+                elements.sliderRange.value = pos;
+            }
+            if (elements.positionBadge) {
+                elements.positionBadge.textContent = `${Math.round(pos)}%`;
+            }
+
+            if (state.orientation === 'horizontal') {
+                // Horizontal Wipe: clip inset(top right bottom left)
+                // Clip top overlay (Before Image) from right
+                const clipRight = 100 - pos;
+                elements.beforeImageContainer.style.clipPath = `inset(0 ${clipRight}% 0 0)`;
+                
+                // Position Vertical Divider Line
+                elements.dividerBar.style.width = '2px';
+                elements.dividerBar.style.height = '100%';
+                elements.dividerBar.style.left = `${pos}%`;
+                elements.dividerBar.style.top = '0';
+                
+                elements.sliderHandle.style.left = `${pos}%`;
+                elements.sliderHandle.style.top = '50%';
+                elements.sliderHandle.style.transform = 'translate(-50%, -50%)';
+                
+                // Orientation specific cursors & icons
+                elements.sliderRange.className = 'slider-overlay absolute inset-0 w-full h-full z-30 opacity-0 cursor-ew-resize';
+                elements.handleIcon.setAttribute('data-lucide', 'chevrons-left-right');
+
+                // Label positions
+                elements.beforeLabel.style.left = '16px';
+                elements.beforeLabel.style.top = '16px';
+                elements.beforeLabel.style.bottom = 'auto';
+
+                elements.afterLabel.style.right = '16px';
+                elements.afterLabel.style.top = '16px';
+                elements.afterLabel.style.bottom = 'auto';
+
+            } else {
+                // Vertical Wipe: clip top overlay from bottom
+                const clipBottom = 100 - pos;
+                elements.beforeImageContainer.style.clipPath = `inset(0 0 ${clipBottom}% 0)`;
+                
+                // Position Horizontal Divider Line
+                elements.dividerBar.style.width = '100%';
+                elements.dividerBar.style.height = '2px';
+                elements.dividerBar.style.left = '0';
+                elements.dividerBar.style.top = `${pos}%`;
+                
+                elements.sliderHandle.style.left = '50%';
+                elements.sliderHandle.style.top = `${pos}%`;
+                elements.sliderHandle.style.transform = 'translate(-50%, -50%)';
+
+                // Orientation specific cursors & icons
+                elements.sliderRange.className = 'slider-overlay absolute inset-0 w-full h-full z-30 opacity-0 cursor-ns-resize';
+                elements.handleIcon.setAttribute('data-lucide', 'chevrons-up-down');
+
+                // Label positions
+                elements.beforeLabel.style.left = '16px';
+                elements.beforeLabel.style.top = '16px';
+                elements.beforeLabel.style.bottom = 'auto';
+
+                elements.afterLabel.style.left = '16px';
+                elements.afterLabel.style.bottom = '16px';
+                elements.afterLabel.style.top = 'auto';
+            }
+
+            // Re-render Lucide icon inside handle
+            lucide.createIcons({
+                targets: [elements.handleIcon]
+            });
+        }
+
+        // Auto Scan / Side-to-Side Animation Loop
+        function toggleAutoScan() {
+            if (state.isAutoScanning) {
+                clearInterval(state.autoScanInterval);
+                state.isAutoScanning = false;
+                elements.autoScanBtn.classList.remove('bg-emerald-600/30', 'border-emerald-500');
+                elements.autoScanBtn.innerHTML = `<i data-lucide="play" class="w-3 h-3 text-emerald-400"></i> Auto`;
+            } else {
+                state.isAutoScanning = true;
+                elements.autoScanBtn.classList.add('bg-emerald-600/30', 'border-emerald-500');
+                elements.autoScanBtn.innerHTML = `<i data-lucide="pause" class="w-3 h-3 text-amber-400"></i> Pause`;
+
+                state.autoScanInterval = setInterval(() => {
+                    let nextPos = state.sliderPosition + (0.4 * state.autoScanDirection);
+                    if (nextPos >= 98) {
+                        nextPos = 98;
+                        state.autoScanDirection = -1;
+                    } else if (nextPos <= 2) {
+                        nextPos = 2;
+                        state.autoScanDirection = 1;
+                    }
+                    state.sliderPosition = nextPos;
+                    updateSlider();
+                }, 16);
+            }
+            lucide.createIcons();
+        }
+
+        // Zoom & Pan Transformation Handler
+        function updateTransform() {
+            elements.zoomPanWrapper.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomLevel})`;
+            elements.zoomLevelText.textContent = `${Math.round(state.zoomLevel * 100)}%`;
+        }
+
+        function setZoom(newZoom) {
+            state.zoomLevel = Math.min(Math.max(1, newZoom), 4);
+            if (state.zoomLevel === 1) {
+                state.panX = 0;
+                state.panY = 0;
+            }
+            updateTransform();
+        }
+
+        // Image Swap Action
+        function swapImages() {
+            const currentBeforeSrc = elements.beforeImg.src;
+            const currentAfterSrc = elements.afterImg.src;
+            elements.beforeImg.src = currentAfterSrc;
+            elements.afterImg.src = currentBeforeSrc;
+
+            // Swap Label Texts
+            const tempText = elements.beforeInputText.value;
+            elements.beforeInputText.value = elements.afterInputText.value;
+            elements.afterInputText.value = tempText;
+            updateLabels();
+        }
+
+        // Update Text Labels
+        function updateLabels() {
+            elements.beforeLabelText.textContent = elements.beforeInputText.value || 'Before';
+            elements.afterLabelText.textContent = elements.afterInputText.value || 'After';
+        }
+
+        // Event Listeners Registration
+        function initEventListeners() {
+            
+            // Slider Range Input Event
+            elements.sliderRange.addEventListener('input', (e) => {
+                if (state.isAutoScanning) toggleAutoScan();
+                state.sliderPosition = parseFloat(e.target.value);
+                updateSlider();
+            });
+
+            // Keyboard Arrow Key Navigation for Accessibility
+            window.addEventListener('keydown', (e) => {
+                if (document.activeElement.tagName === 'INPUT') return; // Skip if typing in label boxes
+                
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    if (state.isAutoScanning) toggleAutoScan();
+                    state.sliderPosition = Math.max(0, state.sliderPosition - 2);
+                    updateSlider();
+                } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    if (state.isAutoScanning) toggleAutoScan();
+                    state.sliderPosition = Math.min(100, state.sliderPosition + 2);
+                    updateSlider();
+                }
+            });
+
+            // Preset Buttons Click
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    if (state.isAutoScanning) toggleAutoScan();
+                    const val = parseFloat(btn.getAttribute('data-preset'));
+                    state.sliderPosition = val;
+                    updateSlider();
+                });
+            });
+
+            // Auto Scan Button
+            elements.autoScanBtn.addEventListener('click', toggleAutoScan);
+
+            // Orientation Switcher
+            elements.orientationBtn.addEventListener('click', () => {
+                state.orientation = state.orientation === 'horizontal' ? 'vertical' : 'horizontal';
+                elements.orientationLabel.textContent = state.orientation.charAt(0).toUpperCase() + state.orientation.slice(1);
+                updateSlider();
+            });
+
+            // Swap Images Button
+            elements.swapImagesBtn.addEventListener('click', swapImages);
+
+            // Label Visibility Checkbox
+            elements.toggleLabelsCheckbox.addEventListener('change', (e) => {
+                state.showLabels = e.target.checked;
+                const opacity = state.showLabels ? '1' : '0';
+                elements.beforeLabel.style.opacity = opacity;
+                elements.afterLabel.style.opacity = opacity;
+                elements.labelsConfigArea.style.display = state.showLabels ? 'grid' : 'none';
+            });
+
+            // Label Custom Inputs
+            elements.beforeInputText.addEventListener('input', updateLabels);
+            elements.afterInputText.addEventListener('input', updateLabels);
+
+            // Preset Dropdown Selection
+            elements.sampleSelect.addEventListener('change', (e) => {
+                const presetKey = e.target.value;
+                const pair = SAMPLE_PAIRS[presetKey];
+                if (pair) {
+                    elements.beforeImg.src = pair.before;
+                    elements.afterImg.src = pair.after;
+                    elements.beforeInputText.value = pair.beforeLabel;
+                    elements.afterInputText.value = pair.afterLabel;
+                    updateLabels();
+                    
+                    // Reset position to middle
+                    state.sliderPosition = 50;
+                    updateSlider();
+                }
+            });
+
+            // Theme Color Accent Buttons
+            document.querySelectorAll('.theme-color-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const color = btn.getAttribute('data-color');
+                    state.currentColor = color;
+                    elements.dividerBar.style.backgroundColor = color;
+                    elements.sliderHandle.style.borderColor = color;
+                    
+                    // Active border feedback
+                    document.querySelectorAll('.theme-color-btn').forEach(b => b.classList.remove('ring-2', 'ring-indigo-500/30', 'border-indigo-500'));
+                    btn.classList.add('ring-2', 'ring-indigo-500/30', 'border-indigo-500');
+                });
+            });
+
+            // Zoom Controls
+            elements.zoomInBtn.addEventListener('click', () => setZoom(state.zoomLevel + 0.3));
+            elements.zoomOutBtn.addEventListener('click', () => setZoom(state.zoomLevel - 0.3));
+            elements.resetZoomBtn.addEventListener('click', () => setZoom(1));
+
+            // Pan Dragging Logic (Enabled when Zoomed in)
+            elements.comparisonContainer.addEventListener('mousedown', (e) => {
+                if (state.zoomLevel > 1 && e.button === 0) {
+                    state.isPanning = true;
+                    state.startPanX = e.clientX - state.panX;
+                    state.startPanY = e.clientY - state.panY;
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (state.isPanning) {
+                    state.panX = e.clientX - state.startPanX;
+                    state.panY = e.clientY - state.startPanY;
+                    updateTransform();
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                state.isPanning = false;
+            });
+
+            // Double Click to Reset Zoom
+            elements.comparisonContainer.addEventListener('dblclick', () => {
+                setZoom(1);
+            });
+
+            // Fullscreen Toggle
+            elements.fullscreenBtn.addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    elements.comparisonContainer.requestFullscreen().catch(err => {
+                        console.error(`Error attempting fullscreen: ${err.message}`);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+
+            // Modal Controls
+            const openModal = () => {
+                elements.uploadModal.classList.remove('opacity-0', 'pointer-events-none');
+                elements.uploadModalContent.classList.remove('scale-95');
+                elements.uploadModalContent.classList.add('scale-100');
+            };
+
+            const closeModal = () => {
+                elements.uploadModal.classList.add('opacity-0', 'pointer-events-none');
+                elements.uploadModalContent.classList.remove('scale-100');
+                elements.uploadModalContent.classList.add('scale-95');
+            };
+
+            elements.openUploadModalBtn.addEventListener('click', openModal);
+            elements.closeUploadModalBtn.addEventListener('click', closeModal);
+            elements.cancelUploadBtn.addEventListener('click', closeModal);
+
+            // File Upload / Drag-and-Drop Handler
+            setupDropZone(elements.beforeDropZone, elements.beforeFileInput, (dataUrl) => {
+                state.tempUploads.before = dataUrl;
+            });
+
+            setupDropZone(elements.afterDropZone, elements.afterFileInput, (dataUrl) => {
+                state.tempUploads.after = dataUrl;
+            });
+
+            // Apply Uploaded Images
+            elements.applyUploadBtn.addEventListener('click', () => {
+                if (state.tempUploads.before) {
+                    elements.beforeImg.src = state.tempUploads.before;
+                }
+                if (state.tempUploads.after) {
+                    elements.afterImg.src = state.tempUploads.after;
+                }
+                closeModal();
+            });
+        }
+
+        // Helper to Configure File Drop Zones
+        function setupDropZone(dropZone, fileInput, callback) {
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) handleFile(file);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.add('border-indigo-500', 'bg-slate-800/80');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropZone.classList.remove('border-indigo-500', 'bg-slate-800/80');
+                });
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                const file = e.dataTransfer.files[0];
+                if (file) handleFile(file);
+            });
+
+            function handleFile(file) {
+                if (!file.type.startsWith('image/')) {
+                    alert('Please upload a valid image file (PNG, JPG, WEBP).');
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    callback(e.target.result);
+                    // Visual feedback in drop zone
+                    dropZone.innerHTML = `
+                        <i data-lucide="check-circle" class="w-7 h-7 text-emerald-400 mb-2"></i>
+                        <span class="text-xs text-emerald-300 font-semibold">Image Loaded</span>
+                        <span class="text-[10px] text-slate-400 truncate max-w-[140px] mt-1">${file.name}</span>
+                    `;
+                    lucide.createIcons();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Initialize App on Page Load
+        window.addEventListener('DOMContentLoaded', () => {
+            initEventListeners();
+            updateSlider();
+            updateLabels();
+        });
+    </script>
+</body>
+</html>
